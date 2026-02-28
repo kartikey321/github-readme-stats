@@ -1,17 +1,13 @@
 // @ts-check
 
-import axios from "axios";
-import * as dotenv from "dotenv";
 import githubUsernameRegex from "github-username-regex";
 import { calculateRank } from "../calculateRank.js";
 import { retryer } from "../common/retryer.js";
 import { logger } from "../common/log.js";
-import { excludeRepositories } from "../common/envs.js";
+import { getExcludeRepositories } from "../common/envs.js";
 import { CustomError, MissingParamError } from "../common/error.js";
 import { wrapTextMultiline } from "../common/fmt.js";
 import { request } from "../common/http.js";
-
-dotenv.config();
 
 // GraphQL queries.
 const GRAPHQL_REPOS_FIELD = `
@@ -83,7 +79,7 @@ const GRAPHQL_STATS_QUERY = `
  *
  * @param {object & { after: string | null }} variables Fetcher variables.
  * @param {string} token GitHub token.
- * @returns {Promise<import('axios').AxiosResponse>} Axios response.
+ * @returns {Promise<{ data: any, headers: any }>} Fetch response.
  */
 const fetcher = (variables, token) => {
   const query = variables.after ? GRAPHQL_REPOS_QUERY : GRAPHQL_STATS_QUERY;
@@ -107,7 +103,8 @@ const fetcher = (variables, token) => {
  * @param {boolean} variables.includeDiscussions Include discussions.
  * @param {boolean} variables.includeDiscussionsAnswers Include discussions answers.
  * @param {string|undefined} variables.startTime Time to start the count of total commits.
- * @returns {Promise<import('axios').AxiosResponse>} Axios response.
+ * @param {Record<string, any>} [variables.env] Environment variables instance.
+ * @returns {Promise<{ data: any, headers: any }>} Fetch response.
  *
  * @description This function supports multi-page fetching if the 'FETCH_MULTI_PAGE_STARS' environment variable is set to true.
  */
@@ -117,6 +114,7 @@ const statsFetcher = async ({
   includeDiscussions,
   includeDiscussionsAnswers,
   startTime,
+  env = {},
 }) => {
   let stats;
   let hasNextPage = true;
@@ -131,8 +129,8 @@ const statsFetcher = async ({
       includeDiscussionsAnswers,
       startTime,
     };
-    let res = await retryer(fetcher, variables);
-    if (res.data.errors) {
+    let res = await retryer(fetcher, variables, 0, env);
+    if (res.data?.errors) {
       return res;
     }
 
@@ -149,7 +147,7 @@ const statsFetcher = async ({
       (node) => node.stargazers.totalCount !== 0,
     );
     hasNextPage =
-      process.env.FETCH_MULTI_PAGE_STARS === "true" &&
+      env.FETCH_MULTI_PAGE_STARS === "true" &&
       repoNodes.length === repoNodesWithStars.length &&
       res.data.data.user.repositories.pageInfo.hasNextPage;
     endCursor = res.data.data.user.repositories.pageInfo.endCursor;
@@ -163,32 +161,44 @@ const statsFetcher = async ({
  *
  * @param {object} variables Fetcher variables.
  * @param {string} token GitHub token.
- * @returns {Promise<import('axios').AxiosResponse>} Axios response.
+ * @returns {Promise<{ data: any, headers: any }>} Fetch response.
  *
  * @see https://developer.github.com/v3/search/#search-commits
  */
-const fetchTotalCommits = (variables, token) => {
-  return axios({
-    method: "get",
-    url: `https://api.github.com/search/commits?q=author:${variables.login}`,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github.cloak-preview",
-      Authorization: `token ${token}`,
+const fetchTotalCommits = async (variables, token) => {
+  const response = await fetch(
+    `https://api.github.com/search/commits?q=author:${variables.login}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github.cloak-preview",
+        Authorization: `token ${token}`,
+      },
     },
-  });
+  );
+
+  const data = await response.json();
+
+  return {
+    data,
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText,
+  };
 };
 
 /**
  * Fetch all the commits for all the repositories of a given username.
  *
  * @param {string} username GitHub username.
+ * @param {Record<string, any>} [env] Environment variables map.
  * @returns {Promise<number>} Total commits.
  *
  * @description Done like this because the GitHub API does not provide a way to fetch all the commits. See
  * #92#issuecomment-661026467 and #211 for more information.
  */
-const totalCommitsFetcher = async (username) => {
+const totalCommitsFetcher = async (username, env = {}) => {
   if (!githubUsernameRegex.test(username)) {
     logger.log("Invalid username provided.");
     throw new Error("Invalid username provided.");
@@ -196,7 +206,7 @@ const totalCommitsFetcher = async (username) => {
 
   let res;
   try {
-    res = await retryer(fetchTotalCommits, { login: username });
+    res = await retryer(fetchTotalCommits, { login: username }, 0, env);
   } catch (err) {
     logger.log(err);
     throw new Error(err);
@@ -222,6 +232,7 @@ const totalCommitsFetcher = async (username) => {
  * @param {boolean} include_discussions Include discussions.
  * @param {boolean} include_discussions_answers Include discussions answers.
  * @param {number|undefined} commits_year Year to count total commits
+ * @param {Record<string, any>} [env] Environment variables
  * @returns {Promise<import("./types").StatsData>} Stats data.
  */
 const fetchStats = async (
@@ -232,6 +243,7 @@ const fetchStats = async (
   include_discussions = false,
   include_discussions_answers = false,
   commits_year,
+  env = {},
 ) => {
   if (!username) {
     throw new MissingParamError(["username"]);
@@ -258,6 +270,7 @@ const fetchStats = async (
     includeDiscussions: include_discussions,
     includeDiscussionsAnswers: include_discussions_answers,
     startTime: commits_year ? `${commits_year}-01-01T00:00:00Z` : undefined,
+    env,
   });
 
   // Catch GraphQL errors.
@@ -287,7 +300,7 @@ const fetchStats = async (
 
   // if include_all_commits, fetch all commits using the REST API.
   if (include_all_commits) {
-    stats.totalCommits = await totalCommitsFetcher(username);
+    stats.totalCommits = await totalCommitsFetcher(username, env);
   } else {
     stats.totalCommits = user.commits.totalCommitContributions;
   }
@@ -311,7 +324,8 @@ const fetchStats = async (
   stats.contributedTo = user.repositoriesContributedTo.totalCount;
 
   // Retrieve stars while filtering out repositories to be hidden.
-  const allExcludedRepos = [...exclude_repo, ...excludeRepositories];
+  // envs.js is passing back arrays we need to concatenate
+  const allExcludedRepos = [...exclude_repo, ...getExcludeRepositories(env)];
   let repoToHide = new Set(allExcludedRepos);
 
   stats.totalStars = user.repositories.nodes

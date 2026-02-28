@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { fetchTopLanguages } from "../src/fetchers/top-languages.js";
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 const data_langs = {
@@ -62,9 +58,12 @@ const error = {
 
 describe("FetchTopLanguages", () => {
   it("should fetch correct language data while using the new calculation", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    let repo = await fetchTopLanguages("anuraghazra", [], 0.5, 0.5);
+    let repo = await fetchTopLanguages("kartikey321", [], 0.5, 0.5);
     expect(repo).toStrictEqual({
       HTML: {
         color: "#0f0",
@@ -82,9 +81,12 @@ describe("FetchTopLanguages", () => {
   });
 
   it("should fetch correct language data while excluding the 'test-repo-1' repository", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    let repo = await fetchTopLanguages("anuraghazra", ["test-repo-1"]);
+    let repo = await fetchTopLanguages("kartikey321", ["test-repo-1"]);
     expect(repo).toStrictEqual({
       HTML: {
         color: "#0f0",
@@ -102,9 +104,12 @@ describe("FetchTopLanguages", () => {
   });
 
   it("should fetch correct language data while using the old calculation", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    let repo = await fetchTopLanguages("anuraghazra", [], 1, 0);
+    let repo = await fetchTopLanguages("kartikey321", [], 1, 0);
     expect(repo).toStrictEqual({
       HTML: {
         color: "#0f0",
@@ -122,9 +127,12 @@ describe("FetchTopLanguages", () => {
   });
 
   it("should rank languages by the number of repositories they appear in", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    let repo = await fetchTopLanguages("anuraghazra", [], 0, 1);
+    let repo = await fetchTopLanguages("kartikey321", [], 0, 1);
     expect(repo).toStrictEqual({
       HTML: {
         color: "#0f0",
@@ -142,29 +150,38 @@ describe("FetchTopLanguages", () => {
   });
 
   it("should throw specific error when user not found", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, error);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => error,
+      status: 200,
+    }));
 
-    await expect(fetchTopLanguages("anuraghazra")).rejects.toThrow(
+    await expect(fetchTopLanguages("kartikey321")).rejects.toThrow(
       "Could not resolve to a User with the login of 'noname'.",
     );
   });
 
   it("should throw other errors with their message", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, {
-      errors: [{ message: "Some test GraphQL error" }],
-    });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        errors: [{ message: "Some test GraphQL error" }],
+      }),
+      status: 200,
+    }));
 
-    await expect(fetchTopLanguages("anuraghazra")).rejects.toThrow(
+    await expect(fetchTopLanguages("kartikey321")).rejects.toThrow(
       "Some test GraphQL error",
     );
   });
 
   it("should throw error with specific message when error does not contain message property", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, {
-      errors: [{ type: "TEST" }],
-    });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        errors: [{ type: "TEST" }],
+      }),
+      status: 200,
+    }));
 
-    await expect(fetchTopLanguages("anuraghazra")).rejects.toThrow(
+    await expect(fetchTopLanguages("kartikey321")).rejects.toThrow(
       "Something went wrong while trying to retrieve the language data using the GraphQL API.",
     );
   });

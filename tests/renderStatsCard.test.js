@@ -11,7 +11,7 @@ import { CustomError } from "../src/common/error.js";
 import { themes } from "../themes/index.js";
 
 const stats = {
-  name: "Anurag Hazra",
+  name: "Kartikey Mahawar",
   totalStars: 100,
   totalCommits: 200,
   totalIssues: 300,
@@ -30,7 +30,7 @@ describe("Test renderStatsCard", () => {
     document.body.innerHTML = renderStatsCard(stats);
 
     expect(document.getElementsByClassName("header")[0].textContent).toBe(
-      "Anurag Hazra's GitHub Stats",
+      "Kartikey Mahawar's GitHub Stats",
     );
 
     expect(
@@ -145,7 +145,7 @@ describe("Test renderStatsCard", () => {
     });
     expect(document.querySelector("svg")).toHaveAttribute(
       "width",
-      "305.81250000000006",
+      "342.4375000000001",
     );
 
     // Test minimum card width with rank and icons.
@@ -156,7 +156,7 @@ describe("Test renderStatsCard", () => {
     });
     expect(document.querySelector("svg")).toHaveAttribute(
       "width",
-      "322.81250000000006",
+      "359.4375000000001",
     );
 
     // Test minimum card width with icons but without rank.
@@ -356,7 +356,7 @@ describe("Test renderStatsCard", () => {
 
     expect(
       document.body.getElementsByTagName("svg")[0].getAttribute("width"),
-    ).toBe("305.81250000000006");
+    ).toBe("342.4375000000001");
   });
 
   it("should auto resize if hide_rank is true & custom_title is set", () => {
@@ -373,7 +373,7 @@ describe("Test renderStatsCard", () => {
   it("should render translations", () => {
     document.body.innerHTML = renderStatsCard(stats, { locale: "cn" });
     expect(document.getElementsByClassName("header")[0].textContent).toBe(
-      "Anurag Hazra 的 GitHub 统计数据",
+      "Kartikey Mahawar 的 GitHub 统计数据",
     );
     expect(
       document.querySelector(

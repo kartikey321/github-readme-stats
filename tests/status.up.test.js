@@ -3,11 +3,7 @@
  */
 
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import up, { RATE_LIMIT_SECONDS } from "../api/status/up.js";
-
-const mock = new MockAdapter(axios);
 
 const successData = {
   rateLimit: {
@@ -55,12 +51,15 @@ const shields_down = {
 };
 
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/status/up", () => {
   it("should return `true` if request was successful", async () => {
-    mock.onPost("https://api.github.com/graphql").replyOnce(200, successData);
+    jest.spyOn(global, "fetch").mockImplementationOnce(async () => ({
+      json: async () => successData,
+      status: 200,
+    }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -73,7 +72,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return `false` if all PATs are rate limited", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, rate_limit_error);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => rate_limit_error,
+      status: 200,
+    }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -86,7 +88,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return JSON `true` if request was successful and type='json'", async () => {
-    mock.onPost("https://api.github.com/graphql").replyOnce(200, successData);
+    jest.spyOn(global, "fetch").mockImplementationOnce(async () => ({
+      json: async () => successData,
+      status: 200,
+    }));
 
     const { req, res } = faker({ type: "json" }, {});
     await up(req, res);
@@ -99,7 +104,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return JSON `false` if all PATs are rate limited and type='json'", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, rate_limit_error);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => rate_limit_error,
+      status: 200,
+    }));
 
     const { req, res } = faker({ type: "json" }, {});
     await up(req, res);
@@ -112,7 +120,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return UP shields.io config if request was successful and type='shields'", async () => {
-    mock.onPost("https://api.github.com/graphql").replyOnce(200, successData);
+    jest.spyOn(global, "fetch").mockImplementationOnce(async () => ({
+      json: async () => successData,
+      status: 200,
+    }));
 
     const { req, res } = faker({ type: "shields" }, {});
     await up(req, res);
@@ -125,7 +136,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return DOWN shields.io config if all PATs are rate limited and type='shields'", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, rate_limit_error);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => rate_limit_error,
+      status: 200,
+    }));
 
     const { req, res } = faker({ type: "shields" }, {});
     await up(req, res);
@@ -138,11 +152,16 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return `true` if the first PAT is rate limited but the second PATs works", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(200, rate_limit_error)
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(200, successData);
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(async () => ({
+        json: async () => rate_limit_error,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -155,11 +174,16 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return `true` if the first PAT has 'Bad credentials' but the second PAT works", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(404, bad_credentials_error)
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(200, successData);
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(async () => ({
+        json: async () => bad_credentials_error,
+        status: 404,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -172,9 +196,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should return `false` if all pats have 'Bad credentials'", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(404, bad_credentials_error);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => bad_credentials_error,
+      status: 404,
+    }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -187,7 +212,9 @@ describe("Test /api/status/up", () => {
   });
 
   it("should throw an error if the request fails", async () => {
-    mock.onPost("https://api.github.com/graphql").networkError();
+    jest.spyOn(global, "fetch").mockImplementation(async () => {
+      throw new Error("Network Error");
+    });
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -200,7 +227,10 @@ describe("Test /api/status/up", () => {
   });
 
   it("should have proper cache when no error is thrown", async () => {
-    mock.onPost("https://api.github.com/graphql").replyOnce(200, successData);
+    jest.spyOn(global, "fetch").mockImplementationOnce(async () => ({
+      json: async () => successData,
+      status: 200,
+    }));
 
     const { req, res } = faker({}, {});
     await up(req, res);
@@ -212,7 +242,9 @@ describe("Test /api/status/up", () => {
   });
 
   it("should have proper cache when error is thrown", async () => {
-    mock.onPost("https://api.github.com/graphql").networkError();
+    jest.spyOn(global, "fetch").mockImplementation(async () => {
+      throw new Error("Network Error");
+    });
 
     const { req, res } = faker({}, {});
     await up(req, res);

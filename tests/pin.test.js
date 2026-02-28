@@ -2,8 +2,6 @@
 
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import pin from "../api/pin.js";
 import { renderRepoCard } from "../src/cards/repo.js";
 import { renderError } from "../src/common/render.js";
@@ -11,7 +9,7 @@ import { CACHE_TTL, DURATIONS } from "../src/common/cache.js";
 
 const data_repo = {
   repository: {
-    username: "anuraghazra",
+    username: "kartikey321",
     name: "convoychat",
     stargazers: {
       totalCount: 38000,
@@ -34,30 +32,32 @@ const data_user = {
   },
 };
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/pin", () => {
   it("should test the request", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       // @ts-ignore
       renderRepoCard({
         ...data_repo.repository,
@@ -67,101 +67,117 @@ describe("Test /api/pin", () => {
   });
 
   it("should get the query options", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-        title_color: "fff",
-        icon_color: "fff",
-        text_color: "fff",
-        bg_color: "fff",
-        full_name: "1",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
+      title_color: "fff",
+      icon_color: "fff",
+      text_color: "fff",
+      bg_color: "fff",
+      full_name: "1",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderRepoCard(
         // @ts-ignore
         {
           ...data_repo.repository,
           starCount: data_repo.repository.stargazers.totalCount,
         },
-        { ...req.query },
+        { ...query },
       ),
     );
   });
 
   it("should render error card if user repo not found", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, { data: { user: { repository: null }, organization: null } });
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        data: { user: { repository: null }, organization: null },
+      }),
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({ message: "User Repository Not found" }),
     );
   });
 
   it("should render error card if org repo not found", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, { data: { user: null, organization: { repository: null } } });
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        data: { user: null, organization: { repository: null } },
+      }),
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({ message: "Organization Repository Not found" }),
     );
   });
 
   it("should render error card if username in blacklist", async () => {
-    const req = {
-      query: {
-        username: "renovate-bot",
-        repo: "convoychat",
-      },
+    const query = {
+      username: "renovate-bot",
+      repo: "convoychat",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "This username is blacklisted",
         secondaryMessage: "Please deploy your own instance",
@@ -171,23 +187,27 @@ describe("Test /api/pin", () => {
   });
 
   it("should render error card if wrong locale provided", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-        locale: "asdf",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
+      locale: "asdf",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Language not found",
@@ -196,18 +216,18 @@ describe("Test /api/pin", () => {
   });
 
   it("should render error card if missing required parameters", async () => {
-    const req = {
-      query: {},
-    };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
+    const query = {};
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    const response = await pin(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message:
           'Missing params "username", "repo" make sure you pass the parameters in URL',
@@ -218,23 +238,26 @@ describe("Test /api/pin", () => {
   });
 
   it("should have proper cache", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        repo: "convoychat",
-      },
+    const query = {
+      username: "kartikey321",
+      repo: "convoychat",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await pin(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "Cache-Control",
+    const response = await pin(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(response.headers.get("Cache-Control")).toBe(
       `max-age=${CACHE_TTL.PIN_CARD.DEFAULT}, ` +
         `s-maxage=${CACHE_TTL.PIN_CARD.DEFAULT}, ` +
         `stale-while-revalidate=${DURATIONS.ONE_DAY}`,

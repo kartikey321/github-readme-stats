@@ -1,7 +1,5 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { fetchRepo } from "../src/fetchers/repo.js";
 
 const data_repo = {
@@ -32,17 +30,18 @@ const data_org = {
   },
 };
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test fetchRepo", () => {
   it("should fetch correct user repo", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_user,
+      status: 200,
+    }));
 
-    let repo = await fetchRepo("anuraghazra", "convoychat");
+    let repo = await fetchRepo("kartikey321", "convoychat");
 
     expect(repo).toStrictEqual({
       ...data_repo.repository,
@@ -51,9 +50,12 @@ describe("Test fetchRepo", () => {
   });
 
   it("should fetch correct org repo", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, data_org);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_org,
+      status: 200,
+    }));
 
-    let repo = await fetchRepo("anuraghazra", "convoychat");
+    let repo = await fetchRepo("kartikey321", "convoychat");
     expect(repo).toStrictEqual({
       ...data_repo.repository,
       starCount: data_repo.repository.stargazers.totalCount,
@@ -61,44 +63,54 @@ describe("Test fetchRepo", () => {
   });
 
   it("should throw error if user is found but repo is null", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, { data: { user: { repository: null }, organization: null } });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        data: { user: { repository: null }, organization: null },
+      }),
+      status: 200,
+    }));
 
-    await expect(fetchRepo("anuraghazra", "convoychat")).rejects.toThrow(
+    await expect(fetchRepo("kartikey321", "convoychat")).rejects.toThrow(
       "User Repository Not found",
     );
   });
 
   it("should throw error if org is found but repo is null", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, { data: { user: null, organization: { repository: null } } });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        data: { user: null, organization: { repository: null } },
+      }),
+      status: 200,
+    }));
 
-    await expect(fetchRepo("anuraghazra", "convoychat")).rejects.toThrow(
+    await expect(fetchRepo("kartikey321", "convoychat")).rejects.toThrow(
       "Organization Repository Not found",
     );
   });
 
   it("should throw error if both user & org data not found", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, { data: { user: null, organization: null } });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({ data: { user: null, organization: null } }),
+      status: 200,
+    }));
 
-    await expect(fetchRepo("anuraghazra", "convoychat")).rejects.toThrow(
+    await expect(fetchRepo("kartikey321", "convoychat")).rejects.toThrow(
       "Not found",
     );
   });
 
   it("should throw error if repository is private", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, {
-      data: {
-        user: { repository: { ...data_repo, isPrivate: true } },
-        organization: null,
-      },
-    });
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => ({
+        data: {
+          user: { repository: { ...data_repo, isPrivate: true } },
+          organization: null,
+        },
+      }),
+      status: 200,
+    }));
 
-    await expect(fetchRepo("anuraghazra", "convoychat")).rejects.toThrow(
+    await expect(fetchRepo("kartikey321", "convoychat")).rejects.toThrow(
       "User Repository Not found",
     );
   });

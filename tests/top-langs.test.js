@@ -2,8 +2,6 @@
 
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import topLangs from "../api/top-langs.js";
 import { renderTopLanguages } from "../src/cards/top-languages.js";
 import { renderError } from "../src/common/render.js";
@@ -68,53 +66,59 @@ const langs = {
   },
 };
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/top-langs", () => {
   it("should test the request", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-      },
+    const query = {
+      username: "kartikey321",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(renderTopLanguages(langs));
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(renderTopLanguages(langs));
   });
 
   it("should work with the query options", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        hide_title: true,
-        card_width: 100,
-        title_color: "fff",
-        icon_color: "fff",
-        text_color: "fff",
-        bg_color: "fff",
-      },
+    const query = {
+      username: "kartikey321",
+      hide_title: true,
+      card_width: 100,
+      title_color: "fff",
+      icon_color: "fff",
+      text_color: "fff",
+      bg_color: "fff",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderTopLanguages(langs, {
         hide_title: true,
         card_width: 100,
@@ -127,21 +131,25 @@ describe("Test /api/top-langs", () => {
   });
 
   it("should render error card on user data fetch error", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-      },
+    const query = {
+      username: "kartikey321",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, error);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => error,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: error.errors[0].message,
         secondaryMessage:
@@ -151,22 +159,26 @@ describe("Test /api/top-langs", () => {
   });
 
   it("should render error card on incorrect layout input", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        layout: ["pie"],
-      },
+    const query = {
+      username: "kartikey321",
+      layout: "invalid",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Incorrect layout input",
@@ -175,21 +187,25 @@ describe("Test /api/top-langs", () => {
   });
 
   it("should render error card if username in blacklist", async () => {
-    const req = {
-      query: {
-        username: "renovate-bot",
-      },
+    const query = {
+      username: "renovate-bot",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "This username is blacklisted",
         secondaryMessage: "Please deploy your own instance",
@@ -199,22 +215,26 @@ describe("Test /api/top-langs", () => {
   });
 
   it("should render error card if wrong locale provided", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-        locale: "asdf",
-      },
+    const query = {
+      username: "kartikey321",
+      locale: "asdf",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Locale not found",
@@ -223,22 +243,25 @@ describe("Test /api/top-langs", () => {
   });
 
   it("should have proper cache", async () => {
-    const req = {
-      query: {
-        username: "anuraghazra",
-      },
+    const query = {
+      username: "kartikey321",
     };
-    const res = {
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-    mock.onPost("https://api.github.com/graphql").reply(200, data_langs);
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await topLangs(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => data_langs,
+      status: 200,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "Cache-Control",
+    const response = await topLangs(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(response.headers.get("Cache-Control")).toBe(
       `max-age=${CACHE_TTL.TOP_LANGS_CARD.DEFAULT}, ` +
         `s-maxage=${CACHE_TTL.TOP_LANGS_CARD.DEFAULT}, ` +
         `stale-while-revalidate=${DURATIONS.ONE_DAY}`,

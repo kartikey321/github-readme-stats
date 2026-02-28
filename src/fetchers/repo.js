@@ -9,7 +9,7 @@ import { retryer } from "../common/retryer.js";
  *
  * @param {object} variables Fetcher variables.
  * @param {string} token GitHub token.
- * @returns {Promise<import('axios').AxiosResponse>} The response.
+ * @returns {Promise<{ data: any, headers: any }>} The response.
  */
 const fetcher = (variables, token) => {
   return request(
@@ -64,9 +64,10 @@ const urlExample = "/api/pin?username=USERNAME&amp;repo=REPO_NAME";
  *
  * @param {string} username GitHub username.
  * @param {string} reponame GitHub repository name.
+ * @param {Record<string, any>} [env] Environment variables.
  * @returns {Promise<RepositoryData>} Repository data.
  */
-const fetchRepo = async (username, reponame) => {
+const fetchRepo = async (username, reponame, env = {}) => {
   if (!username && !reponame) {
     throw new MissingParamError(["username", "repo"], urlExample);
   }
@@ -77,7 +78,7 @@ const fetchRepo = async (username, reponame) => {
     throw new MissingParamError(["repo"], urlExample);
   }
 
-  let res = await retryer(fetcher, { login: username, repo: reponame });
+  let res = await retryer(fetcher, { login: username, repo: reponame }, 0, env);
 
   const data = res.data.data;
 

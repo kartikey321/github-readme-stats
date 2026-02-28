@@ -1,7 +1,5 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { fetchGist } from "../src/fetchers/gist.js";
 
 const gist_data = {
@@ -68,15 +66,16 @@ const gist_errors_data = {
   ],
 };
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test fetchGist", () => {
   it("should fetch gist correctly", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, gist_data);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => gist_data,
+      status: 200,
+    }));
 
     let gist = await fetchGist("bbfce31e0217a3689c8d961a356cb10d");
 
@@ -92,9 +91,10 @@ describe("Test fetchGist", () => {
   });
 
   it("should throw correct error if gist not found", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .reply(200, gist_not_found_data);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => gist_not_found_data,
+      status: 200,
+    }));
 
     await expect(fetchGist("bbfce31e0217a3689c8d961a356cb10d")).rejects.toThrow(
       "Gist not found",
@@ -102,7 +102,10 @@ describe("Test fetchGist", () => {
   });
 
   it("should throw error if reaponse contains them", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, gist_errors_data);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => gist_errors_data,
+      status: 200,
+    }));
 
     await expect(fetchGist("bbfce31e0217a3689c8d961a356cb10d")).rejects.toThrow(
       "Some test GraphQL error",

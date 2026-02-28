@@ -5,8 +5,8 @@ import { guardAccess } from "../src/common/access.js";
 import {
   CACHE_TTL,
   resolveCacheSeconds,
-  setCacheHeaders,
-  setErrorCacheHeaders,
+  getCacheHeaders,
+  getErrorCacheHeaders,
 } from "../src/common/cache.js";
 import {
   MissingParamError,
@@ -17,8 +17,10 @@ import { renderError } from "../src/common/render.js";
 import { fetchTopLanguages } from "../src/fetchers/top-languages.js";
 import { isLocaleAvailable } from "../src/translations.js";
 
-// @ts-ignore
-export default async (req, res) => {
+export default async (request, env) => {
+  const url = new URL(request.url, "http://localhost");
+  const query = Object.fromEntries(url.searchParams.entries());
+
   const {
     username,
     hide,
@@ -42,11 +44,9 @@ export default async (req, res) => {
     disable_animations,
     hide_progress,
     stats_format,
-  } = req.query;
-  res.setHeader("Content-Type", "image/svg+xml");
+  } = query;
 
   const access = guardAccess({
-    res,
     id: username,
     type: "username",
     colors: {
@@ -56,13 +56,14 @@ export default async (req, res) => {
       border_color,
       theme,
     },
+    env,
   });
   if (!access.isPassed) {
     return access.result;
   }
 
   if (locale && !isLocaleAvailable(locale)) {
-    return res.send(
+    return new Response(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Locale not found",
@@ -74,6 +75,7 @@ export default async (req, res) => {
           theme,
         },
       }),
+      { status: 400, headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 
@@ -82,7 +84,7 @@ export default async (req, res) => {
     (typeof layout !== "string" ||
       !["compact", "normal", "donut", "donut-vertical", "pie"].includes(layout))
   ) {
-    return res.send(
+    return new Response(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Incorrect layout input",
@@ -94,6 +96,7 @@ export default async (req, res) => {
           theme,
         },
       }),
+      { status: 400, headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 
@@ -102,7 +105,7 @@ export default async (req, res) => {
     (typeof stats_format !== "string" ||
       !["bytes", "percentages"].includes(stats_format))
   ) {
-    return res.send(
+    return new Response(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Incorrect stats_format input",
@@ -114,6 +117,7 @@ export default async (req, res) => {
           theme,
         },
       }),
+      { status: 400, headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 
@@ -123,17 +127,21 @@ export default async (req, res) => {
       parseArray(exclude_repo),
       size_weight,
       count_weight,
+      env,
     );
-    const cacheSeconds = resolveCacheSeconds({
-      requested: parseInt(cache_seconds, 10),
-      def: CACHE_TTL.TOP_LANGS_CARD.DEFAULT,
-      min: CACHE_TTL.TOP_LANGS_CARD.MIN,
-      max: CACHE_TTL.TOP_LANGS_CARD.MAX,
-    });
+    const cacheSeconds = resolveCacheSeconds(
+      {
+        requested: parseInt(cache_seconds, 10),
+        def: CACHE_TTL.TOP_LANGS_CARD.DEFAULT,
+        min: CACHE_TTL.TOP_LANGS_CARD.MIN,
+        max: CACHE_TTL.TOP_LANGS_CARD.MAX,
+      },
+      env,
+    );
 
-    setCacheHeaders(res, cacheSeconds);
+    const cacheHeaders = getCacheHeaders(cacheSeconds, env);
 
-    return res.send(
+    return new Response(
       renderTopLanguages(topLangs, {
         custom_title,
         hide_title: parseBoolean(hide_title),
@@ -153,11 +161,18 @@ export default async (req, res) => {
         hide_progress: parseBoolean(hide_progress),
         stats_format,
       }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   } catch (err) {
-    setErrorCacheHeaders(res);
+    const cacheHeaders = getErrorCacheHeaders(env);
     if (err instanceof Error) {
-      return res.send(
+      return new Response(
         renderError({
           message: err.message,
           secondaryMessage: retrieveSecondaryMessage(err),
@@ -170,9 +185,16 @@ export default async (req, res) => {
             show_repo_link: !(err instanceof MissingParamError),
           },
         }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "image/svg+xml",
+            ...cacheHeaders,
+          },
+        },
       );
     }
-    return res.send(
+    return new Response(
       renderError({
         message: "An unknown error occurred",
         renderOptions: {
@@ -183,6 +205,13 @@ export default async (req, res) => {
           theme,
         },
       }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   }
 };

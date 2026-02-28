@@ -10,13 +10,13 @@
   ],
   "main": "src/index.js",
   "type": "module",
-  "homepage": "https://github.com/anuraghazra/github-readme-stats",
+  "homepage": "https://github.com/kartikey321/github-readme-stats",
   "bugs": {
-    "url": "https://github.com/anuraghazra/github-readme-stats/issues"
+    "url": "https://github.com/kartikey321/github-readme-stats/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/anuraghazra/github-readme-stats.git"
+    "url": "https://github.com/kartikey321/github-readme-stats.git"
   },
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
@@ -33,7 +33,7 @@
     "lint": "npx eslint --max-warnings 0 \"./src/**/*.js\" \"./scripts/**/*.js\" \"./tests/**/*.js\" \"./api/**/*.js\" \"./themes/**/*.js\"",
     "bench": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.bench.config.js"
   },
-  "author": "Anurag Hazra",
+  "author": "Kartikey Mahawar",
   "license": "MIT",
   "devDependencies": {
     "@actions/core": "^2.0.1",
@@ -43,12 +43,10 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@uppercod/css-to-object": "^1.1.1",
-    "axios-mock-adapter": "^2.1.0",
     "color-contrast-checker": "^2.1.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^61.5.0",
-    "express": "^5.2.1",
     "globals": "^16.5.0",
     "hjson": "^3.2.2",
     "husky": "^9.1.7",
@@ -57,12 +55,13 @@
     "js-yaml": "^4.1.1",
     "lint-staged": "^16.2.7",
     "lodash.snakecase": "^4.1.1",
+    "node-fetch": "^3.3.2",
     "parse-diff": "^0.11.1",
-    "prettier": "^3.7.3"
+    "prettier": "^3.7.3",
+    "whatwg-fetch": "^3.6.20",
+    "wrangler": "^4.69.0"
   },
   "dependencies": {
-    "axios": "^1.13.1",
-    "dotenv": "^17.2.3",
     "emoji-name-map": "^2.0.3",
     "github-username-regex": "^1.0.0",
     "word-wrap": "^1.2.5"

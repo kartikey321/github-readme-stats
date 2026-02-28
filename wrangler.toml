@@ -1,0 +1,14 @@
+name = "github-readme-stats"
+main = "src/worker.js"
+compatibility_date = "2024-09-23"
+
+
+# Define environment variables via secrets in production:
+# wrangler secret put PAT_1
+# wrangler secret put PAT_2
+
+[env.production]
+# Add any production-specific overrides here
+
+[env.dev]
+# Add any dev-specific overrides here

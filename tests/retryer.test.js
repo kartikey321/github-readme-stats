@@ -2,8 +2,10 @@
 
 import { describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import { RETRIES, retryer } from "../src/common/retryer.js";
+import { retryer } from "../src/common/retryer.js";
 import { logger } from "../src/common/log.js";
+
+const RETRIES = 7;
 
 const fetcher = jest.fn((variables, token) => {
   logger.log(variables, token);
@@ -51,21 +53,25 @@ const fetcherFailWithMessageBasedRateLimitErr = jest.fn(
 
 describe("Test Retryer", () => {
   it("retryer should return value and have zero retries on first try", async () => {
-    let res = await retryer(fetcher, {});
+    let res = await retryer(fetcher, {}, 0, { NODE_ENV: "test" });
 
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(res).toStrictEqual({ data: "ok" });
   });
 
   it("retryer should return value and have 2 retries", async () => {
-    let res = await retryer(fetcherFailOnSecondTry, {});
+    let res = await retryer(fetcherFailOnSecondTry, {}, 0, {
+      NODE_ENV: "test",
+    });
 
     expect(fetcherFailOnSecondTry).toHaveBeenCalledTimes(2);
     expect(res).toStrictEqual({ data: "ok" });
   });
 
   it("retryer should return value and have 2 retries with message based rate limit error", async () => {
-    let res = await retryer(fetcherFailWithMessageBasedRateLimitErr, {});
+    let res = await retryer(fetcherFailWithMessageBasedRateLimitErr, {}, 0, {
+      NODE_ENV: "test",
+    });
 
     expect(fetcherFailWithMessageBasedRateLimitErr).toHaveBeenCalledTimes(2);
     expect(res).toStrictEqual({ data: "ok" });
@@ -73,7 +79,7 @@ describe("Test Retryer", () => {
 
   it("retryer should throw specific error if maximum retries reached", async () => {
     try {
-      await retryer(fetcherFail, {});
+      await retryer(fetcherFail, {}, 0, { NODE_ENV: "test" });
     } catch (err) {
       expect(fetcherFail).toHaveBeenCalledTimes(RETRIES + 1);
       // @ts-ignore

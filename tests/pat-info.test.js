@@ -2,9 +2,6 @@
  * @file Tests for the status/pat-info cloud function.
  */
 
-import dotenv from "dotenv";
-dotenv.config();
-
 import {
   afterEach,
   beforeAll,
@@ -13,11 +10,8 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
-import patInfo, { RATE_LIMIT_SECONDS } from "../api/status/pat-info.js";
 
-const mock = new MockAdapter(axios);
+import patInfo, { RATE_LIMIT_SECONDS } from "../api/status/pat-info.js";
 
 const successData = {
   data: {
@@ -67,7 +61,7 @@ const bad_credentials_error = {
 };
 
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/status/pat-info", () => {
@@ -81,11 +75,24 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should return only 'validPATs' if all PATs are valid", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(200, rate_limit_error)
-      .onPost("https://api.github.com/graphql")
-      .reply(200, successData);
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(async () => ({
+        json: async () => rate_limit_error,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }));
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);
@@ -129,11 +136,24 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should return `errorPATs` if a PAT causes an error to be thrown", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(200, other_error)
-      .onPost("https://api.github.com/graphql")
-      .reply(200, successData);
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(async () => ({
+        json: async () => other_error,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }));
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);
@@ -179,11 +199,24 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should return `expiredPaths` if a PAT returns a 'Bad credentials' error", async () => {
-    mock
-      .onPost("https://api.github.com/graphql")
-      .replyOnce(404, bad_credentials_error)
-      .onPost("https://api.github.com/graphql")
-      .reply(200, successData);
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(async () => ({
+        json: async () => bad_credentials_error,
+        status: 404,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }))
+      .mockImplementationOnce(async () => ({
+        json: async () => successData,
+        status: 200,
+      }));
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);
@@ -225,7 +258,9 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should throw an error if something goes wrong", async () => {
-    mock.onPost("https://api.github.com/graphql").networkError();
+    jest.spyOn(global, "fetch").mockImplementation(async () => {
+      throw new Error("Network Error");
+    });
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);
@@ -240,7 +275,10 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should have proper cache when no error is thrown", async () => {
-    mock.onPost("https://api.github.com/graphql").reply(200, successData);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => successData,
+      status: 200,
+    }));
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);
@@ -252,8 +290,9 @@ describe("Test /api/status/pat-info", () => {
   });
 
   it("should have proper cache when error is thrown", async () => {
-    mock.reset();
-    mock.onPost("https://api.github.com/graphql").networkError();
+    jest.spyOn(global, "fetch").mockImplementation(async () => {
+      throw new Error("Network Error");
+    });
 
     const { req, res } = faker({}, {});
     await patInfo(req, res);

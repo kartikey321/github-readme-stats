@@ -223,7 +223,7 @@ const getStyles = ({
       transform: rotate(-90deg);
       animation: rankAnimation 1s forwards ease-in-out;
     }
-    ${process.env.NODE_ENV === "test" ? "" : getProgressAnimation({ progress })}
+    ${typeof process !== "undefined" && process.env.NODE_ENV === "test" ? "" : getProgressAnimation({ progress })}
   `;
 };
 

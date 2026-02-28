@@ -1,11 +1,9 @@
 import api from "../../api/index.js";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { it, jest } from "@jest/globals";
 import { runAndLogStats } from "./utils.js";
 
 const stats = {
-  name: "Anurag Hazra",
+  name: "Kartikey Mahawar",
   totalStars: 100,
   totalCommits: 200,
   totalIssues: 300,
@@ -51,28 +49,36 @@ const data_stats = {
   },
 };
 
-const mock = new MockAdapter(axios);
-
 const faker = (query, data) => {
-  const req = {
-    query: {
-      username: "anuraghazra",
-      ...query,
-    },
-  };
-  const res = {
-    setHeader: jest.fn(),
-    send: jest.fn(),
-  };
-  mock.onPost("https://api.github.com/graphql").replyOnce(200, data);
+  const req = new Request(
+    `http://localhost/api?username=kartikey321&${new URLSearchParams(query).toString()}`,
+  );
+  const env = { PAT_1: "mocktoken" };
 
-  return { req, res };
+  let callCount = 0;
+  jest.spyOn(global, "fetch").mockImplementation(async () => {
+    callCount++;
+    if (callCount === 1)
+      return {
+        ok: true,
+        json: async () => data,
+        status: 200,
+        headers: new Map(),
+      };
+    return {
+      ok: true,
+      json: async () => data,
+      status: 200,
+      headers: new Map(),
+    };
+  });
+
+  return { req, env };
 };
 
 it("test /api", async () => {
   await runAndLogStats("test /api", async () => {
-    const { req, res } = faker({}, data_stats);
-
-    await api(req, res);
+    const { req, env } = faker({}, data_stats);
+    await api(req, env);
   });
 });

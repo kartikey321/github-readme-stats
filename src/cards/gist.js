@@ -17,12 +17,8 @@ import { parseEmojis } from "../common/ops.js";
  *
  * @description Here we use the workaround found in
  * https://stackoverflow.com/questions/66726365/how-should-i-import-json-in-node
- * since vercel is using v16.14.0 which does not yet support json imports without the
- * --experimental-json-modules flag.
  */
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const languageColors = require("../common/languageColors.json"); // now works
+import languageColors from "../common/languageColors.js";
 
 const ICON_SIZE = 16;
 const CARD_DEFAULT_WIDTH = 400;

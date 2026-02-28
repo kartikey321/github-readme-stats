@@ -1,12 +1,10 @@
 import pin from "../../api/pin.js";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { it, jest } from "@jest/globals";
 import { runAndLogStats } from "./utils.js";
 
 const data_repo = {
   repository: {
-    username: "anuraghazra",
+    username: "kartikey321",
     name: "convoychat",
     stargazers: {
       totalCount: 38000,
@@ -29,14 +27,16 @@ const data_user = {
   },
 };
 
-const mock = new MockAdapter(axios);
-mock.onPost("https://api.github.com/graphql").reply(200, data_user);
+jest.spyOn(global, "fetch").mockImplementation(async () => ({
+  json: async () => data_user,
+  status: 200,
+}));
 
 it("test /api/pin", async () => {
   await runAndLogStats("test /api/pin", async () => {
     const req = {
       query: {
-        username: "anuraghazra",
+        username: "kartikey321",
         repo: "convoychat",
       },
     };

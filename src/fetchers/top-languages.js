@@ -2,7 +2,7 @@
 
 import { retryer } from "../common/retryer.js";
 import { logger } from "../common/log.js";
-import { excludeRepositories } from "../common/envs.js";
+import { getExcludeRepositories } from "../common/envs.js";
 import { CustomError, MissingParamError } from "../common/error.js";
 import { wrapTextMultiline } from "../common/fmt.js";
 import { request } from "../common/http.js";
@@ -12,7 +12,7 @@ import { request } from "../common/http.js";
  *
  * @param {any} variables Fetcher variables.
  * @param {string} token GitHub token.
- * @returns {Promise<import("axios").AxiosResponse>} Languages fetcher response.
+ * @returns {Promise<{ data: any, headers: any }>} Languages fetcher response.
  */
 const fetcher = (variables, token) => {
   return request(
@@ -57,6 +57,7 @@ const fetcher = (variables, token) => {
  * @param {string[]} exclude_repo List of repositories to exclude.
  * @param {number} size_weight Weightage to be given to size.
  * @param {number} count_weight Weightage to be given to count.
+ * @param {Record<string, any>} [env] Environment variables.
  * @returns {Promise<TopLangData>} Top languages data.
  */
 const fetchTopLanguages = async (
@@ -64,12 +65,13 @@ const fetchTopLanguages = async (
   exclude_repo = [],
   size_weight = 1,
   count_weight = 0,
+  env = {},
 ) => {
   if (!username) {
     throw new MissingParamError(["username"]);
   }
 
-  const res = await retryer(fetcher, { login: username });
+  let res = await retryer(fetcher, { login: username }, 0, env);
 
   if (res.data.errors) {
     logger.error(res.data.errors);
@@ -94,7 +96,7 @@ const fetchTopLanguages = async (
   let repoNodes = res.data.data.user.repositories.nodes;
   /** @type {Record<string, boolean>} */
   let repoToHide = {};
-  const allExcludedRepos = [...exclude_repo, ...excludeRepositories];
+  const allExcludedRepos = [...exclude_repo, ...getExcludeRepositories(env)];
 
   // populate repoToHide map for quick lookup
   // while filtering out

@@ -70,11 +70,17 @@ const CACHE_TTL = {
  * @param {number} args.max The maximum cache seconds.
  * @returns {number} The resolved cache seconds.
  */
-const resolveCacheSeconds = ({ requested, def, min, max }) => {
+const resolveCacheSeconds = ({ requested, def, min, max }, env = {}) => {
   let cacheSeconds = clampValue(isNaN(requested) ? def : requested, min, max);
+  const resolvedEnv =
+    Object.keys(env).length > 0
+      ? env
+      : typeof process !== "undefined"
+        ? process.env
+        : {};
 
-  if (process.env.CACHE_SECONDS) {
-    const envCacheSeconds = parseInt(process.env.CACHE_SECONDS, 10);
+  if (resolvedEnv.CACHE_SECONDS) {
+    const envCacheSeconds = parseInt(resolvedEnv.CACHE_SECONDS, 10);
     if (!isNaN(envCacheSeconds)) {
       cacheSeconds = envCacheSeconds;
     }
@@ -84,70 +90,72 @@ const resolveCacheSeconds = ({ requested, def, min, max }) => {
 };
 
 /**
- * Disables caching by setting appropriate headers on the response object.
+ * Returns cache headers for Cloudflare Workers Response objects.
  *
- * @param {any} res The response object.
+ * @param {number} cacheSeconds The cache seconds.
+ * @param {Record<string, any>} env Environment bindings.
+ * @returns {Record<string, string>} Header object
  */
-const disableCaching = (res) => {
-  // Disable caching for browsers, shared caches/CDNs, and GitHub Camo.
-  res.setHeader(
-    "Cache-Control",
-    "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
-  );
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-};
+const getCacheHeaders = (cacheSeconds, env = {}) => {
+  const resolvedEnv =
+    Object.keys(env).length > 0
+      ? env
+      : typeof process !== "undefined"
+        ? process.env
+        : {};
 
-/**
- * Sets the Cache-Control headers on the response object.
- *
- * @param {any} res The response object.
- * @param {number} cacheSeconds The cache seconds to set in the headers.
- */
-const setCacheHeaders = (res, cacheSeconds) => {
-  if (cacheSeconds < 1 || process.env.NODE_ENV === "development") {
-    disableCaching(res);
-    return;
+  if (cacheSeconds < 1 || resolvedEnv.NODE_ENV === "development") {
+    return {
+      "Cache-Control":
+        "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
+      Pragma: "no-cache",
+      Expires: "0",
+    };
   }
 
-  res.setHeader(
-    "Cache-Control",
-    `max-age=${cacheSeconds}, ` +
-      `s-maxage=${cacheSeconds}, ` +
-      `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-  );
+  return {
+    "Cache-Control": `max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+  };
 };
 
 /**
- * Sets the Cache-Control headers for error responses on the response object.
+ * Returns error cache headers for Cloudflare Workers Response objects.
  *
- * @param {any} res The response object.
+ * @param {Record<string, any>} env Environment bindings.
+ * @returns {Record<string, string>} Header object
  */
-const setErrorCacheHeaders = (res) => {
-  const envCacheSeconds = process.env.CACHE_SECONDS
-    ? parseInt(process.env.CACHE_SECONDS, 10)
+const getErrorCacheHeaders = (env = {}) => {
+  const resolvedEnv =
+    Object.keys(env).length > 0
+      ? env
+      : typeof process !== "undefined"
+        ? process.env
+        : {};
+  const envCacheSeconds = resolvedEnv.CACHE_SECONDS
+    ? parseInt(resolvedEnv.CACHE_SECONDS, 10)
     : NaN;
+
   if (
     (!isNaN(envCacheSeconds) && envCacheSeconds < 1) ||
-    process.env.NODE_ENV === "development"
+    resolvedEnv.NODE_ENV === "development"
   ) {
-    disableCaching(res);
-    return;
+    return {
+      "Cache-Control":
+        "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
+      Pragma: "no-cache",
+      Expires: "0",
+    };
   }
 
-  // Use lower cache period for errors.
-  res.setHeader(
-    "Cache-Control",
-    `max-age=${CACHE_TTL.ERROR}, ` +
-      `s-maxage=${CACHE_TTL.ERROR}, ` +
-      `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-  );
+  return {
+    "Cache-Control": `max-age=${CACHE_TTL.ERROR}, s-maxage=${CACHE_TTL.ERROR}, stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+  };
 };
 
 export {
   resolveCacheSeconds,
-  setCacheHeaders,
-  setErrorCacheHeaders,
+  getCacheHeaders,
+  getErrorCacheHeaders,
   DURATIONS,
   CACHE_TTL,
 };

@@ -1,13 +1,9 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { fetchWakatimeStats } from "../src/fetchers/wakatime.js";
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 const wakaTimeData = {
@@ -97,26 +93,30 @@ const wakaTimeData = {
     total_seconds: 80473.135716,
     total_seconds_including_other_language: 81643.570077,
     user_id: "random hash",
-    username: "anuraghazra",
+    username: "kartikey321",
     writes_only: false,
   },
 };
 
 describe("WakaTime fetcher", () => {
   it("should fetch correct WakaTime data", async () => {
-    const username = "anuraghazra";
-    mock
-      .onGet(
-        `https://wakatime.com/api/v1/users/${username}/stats?is_including_today=true`,
-      )
-      .reply(200, wakaTimeData);
+    const username = "kartikey321";
+
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => wakaTimeData,
+      status: 200,
+      ok: true,
+    }));
 
     const repo = await fetchWakatimeStats({ username });
     expect(repo).toStrictEqual(wakaTimeData.data);
   });
 
   it("should throw error if username param missing", async () => {
-    mock.onGet(/\/https:\/\/wakatime\.com\/api/).reply(404, wakaTimeData);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => wakaTimeData,
+      status: 404,
+    }));
 
     await expect(fetchWakatimeStats("noone")).rejects.toThrow(
       'Missing params "username" make sure you pass the parameters in URL',
@@ -124,7 +124,10 @@ describe("WakaTime fetcher", () => {
   });
 
   it("should throw error if username is not found", async () => {
-    mock.onGet(/\/https:\/\/wakatime\.com\/api/).reply(404, wakaTimeData);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => wakaTimeData,
+      status: 404,
+    }));
 
     await expect(fetchWakatimeStats({ username: "noone" })).rejects.toThrow(
       "Could not resolve to a User with the login of 'noone'",

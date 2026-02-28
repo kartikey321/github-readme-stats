@@ -33,7 +33,7 @@ query gistInfo($gistName: String!) {
  *
  * @param {object} variables Fetcher variables.
  * @param {string} token GitHub token.
- * @returns {Promise<import('axios').AxiosResponse>} The response.
+ * @returns {Promise<{ data: any, headers: any }>} The response.
  */
 const fetcher = async (variables, token) => {
   return await request(
@@ -84,13 +84,14 @@ const calculatePrimaryLanguage = (files) => {
  * Fetch GitHub gist information by given username and ID.
  *
  * @param {string} id GitHub gist ID.
+ * @param {Record<string, any>} [env] Environment variables.
  * @returns {Promise<GistData>} Gist data.
  */
-const fetchGist = async (id) => {
+const fetchGist = async (id, env = {}) => {
   if (!id) {
     throw new MissingParamError(["id"], "/api/gist?id=GIST_ID");
   }
-  const res = await retryer(fetcher, { gistName: id });
+  const res = await retryer(fetcher, { gistName: id }, 0, env);
   if (res.data.errors) {
     throw new Error(res.data.errors[0].message);
   }

@@ -62,9 +62,23 @@ const getPATInfo = async (fetcher, variables) => {
   for (const pat of PATs) {
     try {
       const response = await fetcher(variables, process.env[pat]);
-      const errors = response.data.errors;
+      const responseData = response.data;
+      const errors = responseData.errors;
       const hasErrors = Boolean(errors);
       const errorType = errors?.[0]?.type;
+
+      // Handle HTTP-level errors (bad credentials, suspended accounts)
+      if (response.status === 404 || response.status >= 400) {
+        const message = responseData?.message?.toLowerCase() || "";
+        if (message === "bad credentials") {
+          details[pat] = { status: "expired" };
+          continue;
+        } else if (message.includes("your account was suspended")) {
+          details[pat] = { status: "suspended" };
+          continue;
+        }
+      }
+
       const isRateLimited =
         (hasErrors && errorType === "RATE_LIMITED") ||
         response.data.data?.rateLimit?.remaining === 0;
@@ -94,19 +108,8 @@ const getPATInfo = async (fetcher, variables) => {
         };
       }
     } catch (err) {
-      // Store the PAT if it is expired.
-      const errorMessage = err.response?.data?.message?.toLowerCase();
-      if (errorMessage === "bad credentials") {
-        details[pat] = {
-          status: "expired",
-        };
-      } else if (errorMessage === "sorry. your account was suspended.") {
-        details[pat] = {
-          status: "suspended",
-        };
-      } else {
-        throw err;
-      }
+      // Handle network errors (fetch itself threw)
+      throw err;
     }
   }
 

@@ -8,8 +8,6 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import api from "../api/index.js";
 import { calculateRank } from "../src/calculateRank.js";
 import { renderStatsCard } from "../src/cards/stats.js";
@@ -20,7 +18,7 @@ import { CACHE_TTL, DURATIONS } from "../src/common/cache.js";
  * @type {import("../src/fetchers/stats").StatsData}
  */
 const stats = {
-  name: "Anurag Hazra",
+  name: "Kartikey Mahawar",
   totalStars: 100,
   totalCommits: 200,
   totalIssues: 300,
@@ -88,23 +86,26 @@ const error = {
   ],
 };
 
-const mock = new MockAdapter(axios);
-
-// @ts-ignore
+// eslint-disable-next-line no-unused-vars
 const faker = (query, data) => {
-  const req = {
-    query: {
-      username: "anuraghazra",
-      ...query,
-    },
+  const mergedQuery = {
+    username: "kartikey321",
+    ...query,
   };
-  const res = {
-    setHeader: jest.fn(),
-    send: jest.fn(),
-  };
-  mock.onPost("https://api.github.com/graphql").replyOnce(200, data);
+  const url = new URL("http://localhost/api");
+  for (const [k, v] of Object.entries(mergedQuery)) {
+    url.searchParams.append(k, String(v));
+  }
+  const request = new Request(url.toString());
 
-  return { req, res };
+  let callCount = 0;
+  jest.spyOn(global, "fetch").mockImplementation(async () => {
+    callCount++;
+    if (callCount === 1) return { json: async () => data, status: 200 };
+    return { json: async () => data, status: 200 };
+  });
+
+  return { request, env: {}, query: mergedQuery };
 };
 
 beforeEach(() => {
@@ -112,28 +113,26 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/", () => {
   it("should test the request", async () => {
-    const { req, res } = faker({}, data_stats);
+    const { request, env, query } = faker({}, data_stats);
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
-      renderStatsCard(stats, { ...req.query }),
-    );
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(renderStatsCard(stats, { ...query }));
   });
 
   it("should render error card on error", async () => {
-    const { req, res } = faker({}, error);
+    const { request, env, query } = faker({}, error);
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: error.errors[0].message,
         secondaryMessage:
@@ -143,12 +142,12 @@ describe("Test /api/", () => {
   });
 
   it("should render error card in same theme as requested card", async () => {
-    const { req, res } = faker({ theme: "merko" }, error);
+    const { request, env, query } = faker({ theme: "merko" }, error);
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: error.errors[0].message,
         secondaryMessage:
@@ -159,9 +158,9 @@ describe("Test /api/", () => {
   });
 
   it("should get the query options", async () => {
-    const { req, res } = faker(
+    const { request, env, query } = faker(
       {
-        username: "anuraghazra",
+        username: "kartikey321",
         hide: "issues,prs,contribs",
         show_icons: true,
         hide_border: true,
@@ -174,10 +173,10 @@ describe("Test /api/", () => {
       data_stats,
     );
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderStatsCard(stats, {
         hide: ["issues", "prs", "contribs"],
         show_icons: true,
@@ -192,139 +191,113 @@ describe("Test /api/", () => {
   });
 
   it("should have proper cache", async () => {
-    const { req, res } = faker({}, data_stats);
+    const { request, env, query } = faker({}, data_stats);
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader.mock.calls).toEqual([
-      ["Content-Type", "image/svg+xml"],
-      [
-        "Cache-Control",
-        `max-age=${CACHE_TTL.STATS_CARD.DEFAULT}, ` +
-          `s-maxage=${CACHE_TTL.STATS_CARD.DEFAULT}, ` +
-          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-      ],
-    ]);
+    expect(response.headers.get("Cache-Control")).toBe(
+      `max-age=${CACHE_TTL.STATS_CARD.DEFAULT}, ` +
+        `s-maxage=${CACHE_TTL.STATS_CARD.DEFAULT}, ` +
+        `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+    );
   });
 
   it("should set proper cache", async () => {
     const cache_seconds = DURATIONS.TWELVE_HOURS;
-    const { req, res } = faker({ cache_seconds }, data_stats);
-    await api(req, res);
+    const { request, env, query } = faker({ cache_seconds }, data_stats);
+    const response = await api(request, env);
 
-    expect(res.setHeader.mock.calls).toEqual([
-      ["Content-Type", "image/svg+xml"],
-      [
-        "Cache-Control",
-        `max-age=${cache_seconds}, ` +
-          `s-maxage=${cache_seconds}, ` +
-          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-      ],
-    ]);
+    expect(response.headers.get("Cache-Control")).toBe(
+      `max-age=${cache_seconds}, ` +
+        `s-maxage=${cache_seconds}, ` +
+        `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+    );
   });
 
   it("should set shorter cache when error", async () => {
-    const { req, res } = faker({}, error);
-    await api(req, res);
+    const { request, env, query } = faker({}, error);
+    const response = await api(request, env);
 
-    expect(res.setHeader.mock.calls).toEqual([
-      ["Content-Type", "image/svg+xml"],
-      [
-        "Cache-Control",
-        `max-age=${CACHE_TTL.ERROR}, ` +
-          `s-maxage=${CACHE_TTL.ERROR}, ` +
-          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-      ],
-    ]);
+    expect(response.headers.get("Cache-Control")).toBe(
+      `max-age=${CACHE_TTL.ERROR}, ` +
+        `s-maxage=${CACHE_TTL.ERROR}, ` +
+        `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+    );
   });
 
   it("should properly set cache using CACHE_SECONDS env variable", async () => {
     const cacheSeconds = "10000";
     process.env.CACHE_SECONDS = cacheSeconds;
 
-    const { req, res } = faker({}, data_stats);
-    await api(req, res);
+    const { request, env, query } = faker({}, data_stats);
+    const response = await api(request, env);
 
-    expect(res.setHeader.mock.calls).toEqual([
-      ["Content-Type", "image/svg+xml"],
-      [
-        "Cache-Control",
-        `max-age=${cacheSeconds}, ` +
-          `s-maxage=${cacheSeconds}, ` +
-          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-      ],
-    ]);
+    expect(response.headers.get("Cache-Control")).toBe(
+      `max-age=${cacheSeconds}, ` +
+        `s-maxage=${cacheSeconds}, ` +
+        `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+    );
   });
 
   it("should disable cache when CACHE_SECONDS is set to 0", async () => {
     process.env.CACHE_SECONDS = "0";
 
-    const { req, res } = faker({}, data_stats);
-    await api(req, res);
+    const { request, env, query } = faker({}, data_stats);
+    const response = await api(request, env);
 
-    expect(res.setHeader.mock.calls).toEqual([
-      ["Content-Type", "image/svg+xml"],
-      [
-        "Cache-Control",
-        "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
-      ],
-      ["Pragma", "no-cache"],
-      ["Expires", "0"],
-    ]);
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
+    );
+    expect(response.headers.get("Pragma")).toBe("no-cache");
+    expect(response.headers.get("Expires")).toBe("0");
   });
 
   it("should set proper cache with clamped values", async () => {
     {
-      let { req, res } = faker({ cache_seconds: 200_000 }, data_stats);
-      await api(req, res);
+      let { request, env, query } = faker(
+        { cache_seconds: 200_000 },
+        data_stats,
+      );
+      const response = await api(request, env);
 
-      expect(res.setHeader.mock.calls).toEqual([
-        ["Content-Type", "image/svg+xml"],
-        [
-          "Cache-Control",
-          `max-age=${CACHE_TTL.STATS_CARD.MAX}, ` +
-            `s-maxage=${CACHE_TTL.STATS_CARD.MAX}, ` +
-            `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-        ],
-      ]);
+      expect(response.headers.get("Cache-Control")).toBe(
+        `max-age=${CACHE_TTL.STATS_CARD.MAX}, ` +
+          `s-maxage=${CACHE_TTL.STATS_CARD.MAX}, ` +
+          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+      );
     }
 
     // note i'm using block scoped vars
     {
-      let { req, res } = faker({ cache_seconds: 0 }, data_stats);
-      await api(req, res);
+      let { request, env, query } = faker({ cache_seconds: 0 }, data_stats);
+      const response = await api(request, env);
 
-      expect(res.setHeader.mock.calls).toEqual([
-        ["Content-Type", "image/svg+xml"],
-        [
-          "Cache-Control",
-          `max-age=${CACHE_TTL.STATS_CARD.MIN}, ` +
-            `s-maxage=${CACHE_TTL.STATS_CARD.MIN}, ` +
-            `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-        ],
-      ]);
+      expect(response.headers.get("Cache-Control")).toBe(
+        `max-age=${CACHE_TTL.STATS_CARD.MIN}, ` +
+          `s-maxage=${CACHE_TTL.STATS_CARD.MIN}, ` +
+          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+      );
     }
 
     {
-      let { req, res } = faker({ cache_seconds: -10_000 }, data_stats);
-      await api(req, res);
+      let { request, env, query } = faker(
+        { cache_seconds: -10_000 },
+        data_stats,
+      );
+      const response = await api(request, env);
 
-      expect(res.setHeader.mock.calls).toEqual([
-        ["Content-Type", "image/svg+xml"],
-        [
-          "Cache-Control",
-          `max-age=${CACHE_TTL.STATS_CARD.MIN}, ` +
-            `s-maxage=${CACHE_TTL.STATS_CARD.MIN}, ` +
-            `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
-        ],
-      ]);
+      expect(response.headers.get("Cache-Control")).toBe(
+        `max-age=${CACHE_TTL.STATS_CARD.MIN}, ` +
+          `s-maxage=${CACHE_TTL.STATS_CARD.MIN}, ` +
+          `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
+      );
     }
   });
 
   it("should allow changing ring_color", async () => {
-    const { req, res } = faker(
+    const { request, env, query } = faker(
       {
-        username: "anuraghazra",
+        username: "kartikey321",
         hide: "issues,prs,contribs",
         show_icons: true,
         hide_border: true,
@@ -338,10 +311,10 @@ describe("Test /api/", () => {
       data_stats,
     );
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderStatsCard(stats, {
         hide: ["issues", "prs", "contribs"],
         show_icons: true,
@@ -357,12 +330,15 @@ describe("Test /api/", () => {
   });
 
   it("should render error card if username in blacklist", async () => {
-    const { req, res } = faker({ username: "renovate-bot" }, data_stats);
+    const { request, env, query } = faker(
+      { username: "renovate-bot" },
+      data_stats,
+    );
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "This username is blacklisted",
         secondaryMessage: "Please deploy your own instance",
@@ -372,12 +348,12 @@ describe("Test /api/", () => {
   });
 
   it("should render error card when wrong locale is provided", async () => {
-    const { req, res } = faker({ locale: "asdf" }, data_stats);
+    const { request, env, query } = faker({ locale: "asdf" }, data_stats);
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Language not found",
@@ -386,27 +362,32 @@ describe("Test /api/", () => {
   });
 
   it("should render error card when include_all_commits true and upstream API fails", async () => {
-    mock
-      .onGet("https://api.github.com/search/commits?q=author:anuraghazra")
-      .reply(200, { error: "Some test error message" });
+    jest.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().includes("search/commits")) {
+        return {
+          json: async () => ({ error: "Some test error message" }),
+          status: 200,
+        };
+      }
+      return { json: async () => data_stats, status: 200 };
+    });
 
-    const { req, res } = faker(
-      { username: "anuraghazra", include_all_commits: true },
+    const { request, env, query } = faker(
+      { username: "kartikey321", include_all_commits: true },
       data_stats,
     );
 
-    await api(req, res);
+    const response = await api(request, env);
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    const body = await response.text();
+    expect(body).toBe(
       renderError({
         message: "Could not fetch total commits.",
         secondaryMessage: "Please try again later",
       }),
     );
     // Received SVG output should not contain string "https://tiny.one/readme-stats"
-    expect(res.send.mock.calls[0][0]).not.toContain(
-      "https://tiny.one/readme-stats",
-    );
+    expect(body).not.toContain("https://tiny.one/readme-stats");
   });
 });

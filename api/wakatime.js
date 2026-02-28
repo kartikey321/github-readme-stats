@@ -7,8 +7,8 @@ import { isLocaleAvailable } from "../src/translations.js";
 import {
   CACHE_TTL,
   resolveCacheSeconds,
-  setCacheHeaders,
-  setErrorCacheHeaders,
+  getCacheHeaders,
+  getErrorCacheHeaders,
 } from "../src/common/cache.js";
 import { guardAccess } from "../src/common/access.js";
 import {
@@ -17,8 +17,9 @@ import {
 } from "../src/common/error.js";
 import { parseArray, parseBoolean } from "../src/common/ops.js";
 
-// @ts-ignore
-export default async (req, res) => {
+export default async (request, env) => {
+  const url = new URL(request.url, "http://localhost");
+  const query = Object.fromEntries(url.searchParams.entries());
   const {
     username,
     title_color,
@@ -42,12 +43,9 @@ export default async (req, res) => {
     border_color,
     display_format,
     disable_animations,
-  } = req.query;
-
-  res.setHeader("Content-Type", "image/svg+xml");
+  } = query;
 
   const access = guardAccess({
-    res,
     id: username,
     type: "wakatime",
     colors: {
@@ -57,13 +55,14 @@ export default async (req, res) => {
       border_color,
       theme,
     },
+    env,
   });
   if (!access.isPassed) {
     return access.result;
   }
 
   if (locale && !isLocaleAvailable(locale)) {
-    return res.send(
+    return new Response(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Language not found",
@@ -75,21 +74,25 @@ export default async (req, res) => {
           theme,
         },
       }),
+      { status: 400, headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 
   try {
     const stats = await fetchWakatimeStats({ username, api_domain });
-    const cacheSeconds = resolveCacheSeconds({
-      requested: parseInt(cache_seconds, 10),
-      def: CACHE_TTL.WAKATIME_CARD.DEFAULT,
-      min: CACHE_TTL.WAKATIME_CARD.MIN,
-      max: CACHE_TTL.WAKATIME_CARD.MAX,
-    });
+    const cacheSeconds = resolveCacheSeconds(
+      {
+        requested: parseInt(cache_seconds, 10),
+        def: CACHE_TTL.WAKATIME_CARD.DEFAULT,
+        min: CACHE_TTL.WAKATIME_CARD.MIN,
+        max: CACHE_TTL.WAKATIME_CARD.MAX,
+      },
+      env,
+    );
 
-    setCacheHeaders(res, cacheSeconds);
+    const cacheHeaders = getCacheHeaders(cacheSeconds, env);
 
-    return res.send(
+    return new Response(
       renderWakatimeCard(stats, {
         custom_title,
         hide_title: parseBoolean(hide_title),
@@ -111,11 +114,18 @@ export default async (req, res) => {
         display_format,
         disable_animations: parseBoolean(disable_animations),
       }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   } catch (err) {
-    setErrorCacheHeaders(res);
+    const cacheHeaders = getErrorCacheHeaders(env);
     if (err instanceof Error) {
-      return res.send(
+      return new Response(
         renderError({
           message: err.message,
           secondaryMessage: retrieveSecondaryMessage(err),
@@ -128,9 +138,16 @@ export default async (req, res) => {
             show_repo_link: !(err instanceof MissingParamError),
           },
         }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "image/svg+xml",
+            ...cacheHeaders,
+          },
+        },
       );
     }
-    return res.send(
+    return new Response(
       renderError({
         message: "An unknown error occurred",
         renderOptions: {
@@ -141,6 +158,13 @@ export default async (req, res) => {
           theme,
         },
       }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   }
 };

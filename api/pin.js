@@ -5,8 +5,8 @@ import { guardAccess } from "../src/common/access.js";
 import {
   CACHE_TTL,
   resolveCacheSeconds,
-  setCacheHeaders,
-  setErrorCacheHeaders,
+  getCacheHeaders,
+  getErrorCacheHeaders,
 } from "../src/common/cache.js";
 import {
   MissingParamError,
@@ -17,8 +17,9 @@ import { renderError } from "../src/common/render.js";
 import { fetchRepo } from "../src/fetchers/repo.js";
 import { isLocaleAvailable } from "../src/translations.js";
 
-// @ts-ignore
-export default async (req, res) => {
+export default async (request, env) => {
+  const url = new URL(request.url, "http://localhost");
+  const query = Object.fromEntries(url.searchParams.entries());
   const {
     username,
     repo,
@@ -34,12 +35,9 @@ export default async (req, res) => {
     border_radius,
     border_color,
     description_lines_count,
-  } = req.query;
-
-  res.setHeader("Content-Type", "image/svg+xml");
+  } = query;
 
   const access = guardAccess({
-    res,
     id: username,
     type: "username",
     colors: {
@@ -49,13 +47,14 @@ export default async (req, res) => {
       border_color,
       theme,
     },
+    env,
   });
   if (!access.isPassed) {
     return access.result;
   }
 
   if (locale && !isLocaleAvailable(locale)) {
-    return res.send(
+    return new Response(
       renderError({
         message: "Something went wrong",
         secondaryMessage: "Language not found",
@@ -67,21 +66,25 @@ export default async (req, res) => {
           theme,
         },
       }),
+      { status: 400, headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 
   try {
-    const repoData = await fetchRepo(username, repo);
-    const cacheSeconds = resolveCacheSeconds({
-      requested: parseInt(cache_seconds, 10),
-      def: CACHE_TTL.PIN_CARD.DEFAULT,
-      min: CACHE_TTL.PIN_CARD.MIN,
-      max: CACHE_TTL.PIN_CARD.MAX,
-    });
+    const repoData = await fetchRepo(username, repo, env);
+    const cacheSeconds = resolveCacheSeconds(
+      {
+        requested: parseInt(cache_seconds, 10),
+        def: CACHE_TTL.PIN_CARD.DEFAULT,
+        min: CACHE_TTL.PIN_CARD.MIN,
+        max: CACHE_TTL.PIN_CARD.MAX,
+      },
+      env,
+    );
 
-    setCacheHeaders(res, cacheSeconds);
+    const cacheHeaders = getCacheHeaders(cacheSeconds, env);
 
-    return res.send(
+    return new Response(
       renderRepoCard(repoData, {
         hide_border: parseBoolean(hide_border),
         title_color,
@@ -95,11 +98,18 @@ export default async (req, res) => {
         locale: locale ? locale.toLowerCase() : null,
         description_lines_count,
       }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   } catch (err) {
-    setErrorCacheHeaders(res);
+    const cacheHeaders = getErrorCacheHeaders(env);
     if (err instanceof Error) {
-      return res.send(
+      return new Response(
         renderError({
           message: err.message,
           secondaryMessage: retrieveSecondaryMessage(err),
@@ -112,9 +122,16 @@ export default async (req, res) => {
             show_repo_link: !(err instanceof MissingParamError),
           },
         }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "image/svg+xml",
+            ...cacheHeaders,
+          },
+        },
       );
     }
-    return res.send(
+    return new Response(
       renderError({
         message: "An unknown error occurred",
         renderOptions: {
@@ -125,6 +142,13 @@ export default async (req, res) => {
           theme,
         },
       }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          ...cacheHeaders,
+        },
+      },
     );
   }
 };

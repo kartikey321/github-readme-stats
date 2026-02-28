@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import "@testing-library/jest-dom";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import wakatime from "../api/wakatime.js";
 import { renderWakatimeCard } from "../src/cards/wakatime.js";
 import { CACHE_TTL, DURATIONS } from "../src/common/cache.js";
@@ -93,51 +91,60 @@ const wakaTimeData = {
     total_seconds: 80473.135716,
     total_seconds_including_other_language: 81643.570077,
     user_id: "random hash",
-    username: "anuraghazra",
+    username: "kartikey321",
     writes_only: false,
   },
 };
 
-const mock = new MockAdapter(axios);
-
 afterEach(() => {
-  mock.reset();
+  jest.restoreAllMocks();
 });
 
 describe("Test /api/wakatime", () => {
   it("should test the request", async () => {
-    const username = "anuraghazra";
-    const req = { query: { username } };
-    const res = { setHeader: jest.fn(), send: jest.fn() };
-    mock
-      .onGet(
-        `https://wakatime.com/api/v1/users/${username}/stats?is_including_today=true`,
-      )
-      .reply(200, wakaTimeData);
+    const username = "kartikey321";
+    const query = { username };
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await wakatime(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => wakaTimeData,
+      status: 200,
+      ok: true,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.send).toHaveBeenCalledWith(
+    const response = await wakatime(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await response.text()).toBe(
       renderWakatimeCard(wakaTimeData.data, {}),
     );
   });
 
   it("should have proper cache", async () => {
-    const username = "anuraghazra";
-    const req = { query: { username } };
-    const res = { setHeader: jest.fn(), send: jest.fn() };
-    mock
-      .onGet(
-        `https://wakatime.com/api/v1/users/${username}/stats?is_including_today=true`,
-      )
-      .reply(200, wakaTimeData);
+    const username = "kartikey321";
+    const query = { username };
+    const url = new URL("http://localhost/api");
+    for (const [k, v] of Object.entries(query)) {
+      url.searchParams.append(k, String(v));
+    }
+    const request = new Request(url.toString());
+    const env = {};
 
-    await wakatime(req, res);
+    jest.spyOn(global, "fetch").mockImplementation(async () => ({
+      json: async () => wakaTimeData,
+      status: 200,
+      ok: true,
+    }));
 
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "image/svg+xml");
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "Cache-Control",
+    const response = await wakatime(request, env);
+
+    expect(response.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(response.headers.get("Cache-Control")).toBe(
       `max-age=${CACHE_TTL.WAKATIME_CARD.DEFAULT}, ` +
         `s-maxage=${CACHE_TTL.WAKATIME_CARD.DEFAULT}, ` +
         `stale-while-revalidate=${DURATIONS.ONE_DAY}`,
